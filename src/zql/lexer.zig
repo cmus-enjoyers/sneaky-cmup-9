@@ -47,7 +47,7 @@ pub const Token = struct {
         }
     }
 
-    pub fn printErr(token: Token, allocator: std.mem.Allocator, out: std.fs.File, er: err.Error, input: []const u8) !void {
+    pub fn printErr(token: Token, allocator: std.mem.Allocator, out: *std.Io.Writer, er: err.Error, input: []const u8) !void {
         try err.printToken(
             allocator,
             out,
@@ -77,8 +77,9 @@ pub const Lexer = struct {
     allocator: std.mem.Allocator,
     line_position: usize,
     line: usize,
+    io: std.Io,
 
-    pub fn init(input: []const u8, allocator: std.mem.Allocator) Lexer {
+    pub fn init(io: std.Io, input: []const u8, allocator: std.mem.Allocator) Lexer {
         const tokens: std.ArrayList(Token) = .empty;
         const context_stack: std.ArrayList(ContextType) = .empty;
 
@@ -90,6 +91,7 @@ pub const Lexer = struct {
             .allocator = allocator,
             .line_position = 0,
             .line = 1,
+            .io = io,
         };
     }
 
@@ -263,14 +265,15 @@ pub const Lexer = struct {
             lexer.position += 1;
         }
 
-        const stderr = std.fs.File.stderr();
+        var buf: [512]u8 = .{0} ** 512;
+        var stderr = std.Io.File.stderr().writer(lexer.io, &buf);
 
         while (lexer.shouldConsume(is_string)) {
             if (is_string) {
                 if (lexer.position == lexer.input.len - 1) {
                     try err.printToken(
                         lexer.allocator,
-                        stderr,
+                        &stderr.interface,
                         err.Error.UnterminatedString,
                         lexer.line_position,
                         lexer.line,

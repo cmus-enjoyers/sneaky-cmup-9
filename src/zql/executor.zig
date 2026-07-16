@@ -45,22 +45,28 @@ pub const Executor = struct {
     ast: []ASTNode,
     allocator: std.mem.Allocator,
     identifiers: std.StringHashMap(CmupPlaylist),
-    stderr: std.fs.File,
+    stderr_buf: []u8,
+    stderr: *std.Io.Writer,
     input: []const u8,
 
     pub fn init(
+        io: std.Io,
         allocator: std.mem.Allocator,
         playlists: std.StringHashMap(CmupPlaylist),
         ast: []ASTNode,
-        stderr: std.fs.File,
+        stderr: std.Io.File,
         input: []const u8,
-    ) Executor {
+    ) !Executor {
+        const stderr_buf: []u8 = try allocator.alloc(u8, 512);
+        var stderr_writer = stderr.writer(io, stderr_buf).interface;
+
         return Executor{
             .playlists = playlists,
             .allocator = allocator,
             .identifiers = std.StringHashMap(CmupPlaylist).init(allocator),
             .ast = ast,
-            .stderr = stderr,
+            .stderr = &stderr_writer,
+            .stderr_buf = stderr_buf,
             .input = input,
         };
     }
@@ -68,6 +74,7 @@ pub const Executor = struct {
     pub fn deinit(executor: *Executor) void {
         executor.identifiers.deinit();
         executor.side_effects.deinit();
+        executor.allocator.destroy(executor.stderr_buf);
     }
 
     pub fn printErr(executor: *Executor, token: Token, er: err.Error) !void {

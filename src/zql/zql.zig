@@ -34,6 +34,7 @@ pub const SideEffect = executr.SideEffect;
 const colors = @import("../utils/colors.zig");
 
 pub fn run(
+    io: std.Io,
     parent_allocator: std.mem.Allocator,
     map: std.StringHashMap(CmupPlaylist),
     path: []const u8,
@@ -43,25 +44,25 @@ pub fn run(
 
     const allocator = arena.allocator();
 
-    const file = try std.fs.cwd().openFile(path, .{ .mode = .read_only });
+    const file = try std.Io.Dir.cwd().openFile(io, path, .{ .mode = .read_only });
 
     var buf: [102400]u8 = undefined;
 
-    var buf_reader: std.fs.File.Reader = .init(file, &buf);
+    var buf_reader = file.reader(io, &buf);
 
     const query = try buf_reader.interface.readAlloc(allocator, 102400);
 
-    var lexer = Lexer.init(query, allocator);
+    var lexer = Lexer.init(io, query, allocator);
     defer lexer.deinit();
 
     try lexer.parse();
 
-    var parser = Parser.init(&lexer, allocator);
+    var parser = Parser.init(&lexer, allocator, io);
     defer parser.deinit();
 
     try parser.parse();
 
-    var executor = Executor.init(allocator, map, parser.nodes.items, std.fs.File.stderr(), query);
+    var executor = try Executor.init(io, allocator, map, parser.nodes.items, std.Io.File.stderr(), query);
 
     return executor.execute(getFileNameWithoutExtension(path));
 }

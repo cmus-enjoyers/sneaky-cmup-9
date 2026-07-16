@@ -23,7 +23,7 @@ const error_prefix = colors.red_text("Zql Error") ++ colors.dim_text(" => ");
 
 pub fn printToken(
     allocator: std.mem.Allocator,
-    out: std.fs.File,
+    out: *std.Io.Writer,
     err: Error,
     line_position: usize,
     line: usize,

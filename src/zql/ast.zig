@@ -88,8 +88,9 @@ pub const Parser = struct {
     position: usize,
     allocator: std.mem.Allocator,
     nodes: std.ArrayList(ASTNode),
+    io: std.Io,
 
-    pub fn init(lexer: *Lexer, allocator: std.mem.Allocator) Parser {
+    pub fn init(lexer: *Lexer, allocator: std.mem.Allocator, io: std.Io) Parser {
         const nodes: std.ArrayList(ASTNode) = .empty;
 
         return Parser{
@@ -97,6 +98,7 @@ pub const Parser = struct {
             .allocator = allocator,
             .nodes = nodes,
             .position = 0,
+            .io = io,
         };
     }
 
@@ -109,9 +111,12 @@ pub const Parser = struct {
     }
 
     pub fn printSyntaxError(parser: *Parser, token: lxer.Token) !void {
+        var buf: [512]u8 = .{0} ** 512;
+        var stderr = std.Io.File.stderr().writer(parser.io, &buf).interface;
+
         try token.printErr(
             parser.allocator,
-            std.fs.File.stderr(),
+            &stderr,
             err.Error.SyntaxError,
             parser.lexer.input,
         );
@@ -193,7 +198,6 @@ pub const Parser = struct {
             .data = .{
                 .field = name,
                 .match_type = ASTMatchType.init(try MatchType.toMatchType(match_type.lexeme), match_type),
-
                 .target = target,
             },
             .token = target,
@@ -266,7 +270,9 @@ pub const Parser = struct {
         while (parser.position < parser.lexer.tokens.items.len) : ({
             parser.move();
         }) {
-            const stderr = std.fs.File.stderr();
+            var buf: [512]u8 = .{0} ** 512;
+
+            var stderr = std.Io.File.stderr().writer(parser.io, &buf); // TODO: fix this later
             const item = parser.lexer.tokens.items[parser.position];
 
             const node = try switch (item.type) {
@@ -276,7 +282,7 @@ pub const Parser = struct {
                 .Unknown => {
                     try item.printErr(
                         parser.allocator,
-                        stderr,
+                        &stderr.interface,
                         err.Error.SyntaxError,
                         parser.lexer.input,
                     );
