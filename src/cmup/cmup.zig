@@ -20,6 +20,7 @@ const cmup_used_music_extensions: []const []const u8 = &[_][]const u8{
     "flac",
     "mp3",
     "opus",
+    "webm",
 };
 
 const reset = "\x1b[0m";
@@ -213,15 +214,19 @@ pub fn writeCmupPlaylist(io: std.Io, playlist: CmupPlaylist, path: []const u8) !
         var file = try dir.createFile(io, playlist.name, .{});
         defer file.close(io);
 
+        var buf: [1024]u8 = .{0} ** 1024;
+        var file_writer = file.writer(io, &buf);
+
+        const writer = &file_writer.interface;
+
         const newline = comptime "\n";
 
         for (playlist.content) |music| {
-            var buf: [1024]u8 = .{0} ** 1024;
-            var writer = file.writer(io, &buf).interface;
-
             try writer.writeAll(music);
             try writer.writeAll(newline);
         }
+
+        try writer.flush();
     }
 
     for (playlist.sub_playlists) |sub_playlist| {
@@ -294,11 +299,14 @@ pub fn printCmupPlaylist(
     comptime spacing: []const u8,
 ) !void {
     var buf: [256]u8 = .{0} ** 256;
-    var writer = std.Io.File.stderr().writer(io, &buf).interface;
+
+    var file_writer = std.Io.File.stderr().writer(io, &buf);
+
+    const writer = &file_writer.interface;
 
     const playlist_fmt = try std.fmt.allocPrint(
         allocator,
-        "Playlist" ++ green ++ " {s} " ++ reset ++ "on path {s} with musics amount {}\n",
+        "Playlist" ++ green ++ " {s} " ++ reset ++ "on path {s} with {} items\n",
         .{ playlist.name, playlist.path, playlist.content.len },
     );
 
@@ -306,9 +314,10 @@ pub fn printCmupPlaylist(
 
     for (playlist.content) |value| {
         const content_fmt = try std.fmt.allocPrint(allocator, spacing ++ "  {s}\n", .{value});
-
         try writer.writeAll(content_fmt);
     }
+
+    try writer.flush();
 
     for (playlist.sub_playlists) |sub_playlist| {
         try printCmupPlaylist(io, allocator, sub_playlist.*, "  ");

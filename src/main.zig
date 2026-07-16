@@ -7,10 +7,11 @@ const CmupPlaylist = cmup.CmupPlaylist;
 const path_utils = @import("utils/path.zig");
 
 pub fn printSuccess(io: std.Io) !void {
-    var buf: [256]u8 = .{0} ** 256;
-    var writer = std.Io.File.stdout().writer(io, &buf).interface;
+    var buf: [1024]u8 = .{0} ** 1024;
+    var writer = std.Io.File.stdout().writer(io, &buf);
 
-    try writer.writeAll("\nUpdated playlists :)\n");
+    try writer.interface.writeAll("\nUpdated playlists :)\n");
+    try writer.interface.flush();
 }
 
 pub fn printInfo(io: std.Io) !void {
